@@ -16,13 +16,13 @@ import kotlin.random.Random
 @Composable
 fun App() {
     val gridSize = GridSize(width = 20, height = 20)
-    val bombLocations = remember { mutableMapOf<Location, Boolean>() }
+    val squareStates = remember { mutableMapOf<Location, SquareState>() }
 
     for (column in 0..gridSize.width) {
         for (row in 0..gridSize.height) {
             val isCurrentSquareBomb = Random.nextInt(from = 0, until = 100) < PERCENT_BOMB_CHANCE
             if (isCurrentSquareBomb) {
-                bombLocations[Location(column, row)] = true
+                squareStates[Location(column, row)] = SquareState(isClicked = false, isBomb = isCurrentSquareBomb)
             }
         }
     }
@@ -35,7 +35,7 @@ fun App() {
             }
             Table(
                 gridSize = gridSize,
-                bombLocations = bombLocations,
+                squareStates = squareStates,
                 gameState = gameState
             )
         }
@@ -48,14 +48,15 @@ data class GridSize(val width: Int, val height: Int)
 data class Location(val column: Int, val row: Int)
 sealed class GameState {
     object NotStarted : GameState()
-    object Started : GameState()
+    data class Started(val squareStates: Map<Location, SquareState>) : GameState()
     object Dead : GameState()
 }
+data class SquareState(val isClicked: Boolean, val isBomb: Boolean)
 
 @Composable
 fun Table(
     gridSize: GridSize,
-    bombLocations: Map<Location, Boolean>,
+    squareStates: MutableMap<Location, SquareState>,
     gameState: MutableState<GameState>
 ) {
     Row {
@@ -72,16 +73,16 @@ fun Table(
                     }
 
                     Square(
-                        isBomb = bombLocations.getOrDefault(currentLocation, false),
-                        countBombsSurrounding = bombLocations.countBombsSurrounding(currentLocation),
+                        isBomb = squareStates[currentLocation]?.isBomb ?: false,
+                        countBombsSurrounding = squareStates.countBombsSurrounding(currentLocation),
                         bombClicked = {
                             print("BOOM")
                             gameState.value = GameState.Dead
                         },
                         isClicked = isClicked,
                         squareClicked = {
-                            if (gameState.value == GameState.NotStarted) gameState.value = GameState.Started
-                            if (currentLocation)
+                            if (gameState.value == GameState.NotStarted) gameState.value = GameState.Started()
+                            if (currentLocation )
                             isClicked = true
                         }
                     )
@@ -121,7 +122,7 @@ private fun Square(
     }
 }
 
-private fun Map<Location, Boolean>.countBombsSurrounding(location: Location): Int {
+private fun Map<Location, SquareState>.countBombsSurrounding(location: Location): Int {
     val surroundingLocations = listOf(
         location.copy(column = location.column - 1, row = location.row - 1),
         location.copy(row = location.row - 1),
@@ -132,5 +133,5 @@ private fun Map<Location, Boolean>.countBombsSurrounding(location: Location): In
         location.copy(column = location.column - 1, row = location.row + 1),
         location.copy(column = location.column - 1)
     )
-    return surroundingLocations.count { getOrDefault(it, false) }
+    return surroundingLocations.count { get(it)?.isBomb ?: false  }
 }
